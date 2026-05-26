@@ -8,7 +8,9 @@ app = Flask(__name__)
 
 # === KONEKSI DATABASE ===
 def get_db():
-    return psycopg2.connect(os.environ.get("DATABASE_URL"))
+    url = os.environ.get("DATABASE_URL")
+    print(f"[DEBUG] DATABASE_URL: {url}")
+    return psycopg2.connect(url)
 
 # === BUAT TABEL JIKA BELUM ADA ===
 def init_db():
