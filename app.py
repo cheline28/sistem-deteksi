@@ -7,7 +7,10 @@ app = Flask(__name__)
 
 # === KONFIGURASI SUPABASE ===
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")  # service_role key
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+
+print(f"[DEBUG] SUPABASE_URL: {SUPABASE_URL}")
+print(f"[DEBUG] KEY ada: {SUPABASE_KEY is not None}")
 
 db = create_client(SUPABASE_URL, SUPABASE_KEY)
 
