@@ -27,7 +27,7 @@ def terima_deteksi():
     # Susun format teks lengkap
     # Contoh: 25-5-2026, 13.54.22, Wereng - total: 5
     now          = datetime.now()
-    tanggal      = now.strftime("%-d-%-m-%Y")   # 25-5-2026
+    tanggal      = tanggal = f"{now.day}-{now.month}-{now.year}" 
     jam          = now.strftime("%H.%M.%S")      # 13.54.22
     teks_lengkap = f"{tanggal}, {jam}, {data['label']} - total: {data['total']}"
 
