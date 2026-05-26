@@ -7,6 +7,7 @@ app = Flask(__name__)
 # === SETUP DATABASE ===
 def init_db():
     conn = sqlite3.connect("deteksi.db")
+    conn.execute("DROP TABLE IF EXISTS hasil_deteksi")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS hasil_deteksi (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
