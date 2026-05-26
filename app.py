@@ -1,18 +1,31 @@
 from flask import Flask, request, jsonify, render_template_string
-from supabase import create_client
 from datetime import datetime
+import psycopg2
+import psycopg2.extras
 import os
 
 app = Flask(__name__)
 
-# === KONFIGURASI SUPABASE ===
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+# === KONEKSI DATABASE ===
+def get_db():
+    return psycopg2.connect(os.environ.get("DATABASE_URL"))
 
-print(f"[DEBUG] SUPABASE_URL: {SUPABASE_URL}")
-print(f"[DEBUG] KEY ada: {SUPABASE_KEY is not None}")
+# === BUAT TABEL JIKA BELUM ADA ===
+def init_db():
+    conn = get_db()
+    conn.cursor().execute("""
+        CREATE TABLE IF NOT EXISTS hasil_deteksi (
+            id           SERIAL PRIMARY KEY,
+            timestamp    TEXT,
+            label        TEXT,
+            total        INTEGER,
+            teks_lengkap TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
-db = create_client(SUPABASE_URL, SUPABASE_KEY)
+init_db()
 
 # === ENDPOINT 1: Raspberry Pi kirim data ===
 @app.route("/deteksi", methods=["POST"])
@@ -24,15 +37,16 @@ def terima_deteksi():
     jam          = now.strftime("%H.%M.%S")
     teks_lengkap = f"{tanggal}, {jam}, {data['label']} - total: {data['total']}"
 
-    # Simpan ke Supabase
-    response = db.table("hasil_deteksi").insert({
-        "timestamp"   : f"{tanggal}, {jam}",
-        "label"       : data["label"],
-        "total"       : data["total"],
-        "teks_lengkap": teks_lengkap
-    }).execute()
+    conn   = get_db()
+    cur    = conn.cursor()
+    cur.execute("""
+        INSERT INTO hasil_deteksi (timestamp, label, total, teks_lengkap)
+        VALUES (%s, %s, %s, %s) RETURNING id
+    """, (f"{tanggal}, {jam}", data["label"], data["total"], teks_lengkap))
+    id_baru = cur.fetchone()[0]
+    conn.commit()
+    conn.close()
 
-    id_baru = response.data[0]["id"]
     print(f"[TERSIMPAN] {teks_lengkap}")
 
     return jsonify({
@@ -42,13 +56,15 @@ def terima_deteksi():
     }), 201
 
 
-# === ENDPOINT 2: Ambil semua data (untuk dashboard) ===
+# === ENDPOINT 2: Ambil semua data ===
 @app.route("/deteksi", methods=["GET"])
 def ambil_semua():
-    response = db.table("hasil_deteksi").select("*").order(
-        "id", desc=True
-    ).execute()
-    return jsonify(response.data), 200
+    conn = get_db()
+    cur  = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("SELECT * FROM hasil_deteksi ORDER BY id DESC")
+    rows = cur.fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in rows]), 200
 
 
 # === ENDPOINT 3: Dashboard Web ===
@@ -64,7 +80,6 @@ def dashboard():
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #f0f4f8; color: #333; }
-
         .header {
             background: #1a5c2e;
             color: white;
@@ -75,9 +90,7 @@ def dashboard():
         }
         .header h1 { font-size: 22px; }
         .header span { font-size: 13px; opacity: 0.8; }
-
         .container { max-width: 1000px; margin: 30px auto; padding: 0 20px; }
-
         .stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -93,7 +106,6 @@ def dashboard():
         }
         .stat-card .angka { font-size: 36px; font-weight: bold; color: #1a5c2e; }
         .stat-card .label { font-size: 13px; color: #666; margin-top: 4px; }
-
         .card {
             background: white;
             border-radius: 10px;
@@ -101,12 +113,10 @@ def dashboard():
             box-shadow: 0 2px 8px rgba(0,0,0,0.08);
         }
         .card h2 { font-size: 16px; margin-bottom: 16px; color: #1a5c2e; }
-
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th { background: #1a5c2e; color: white; padding: 10px 14px; text-align: left; }
         td { padding: 10px 14px; border-bottom: 1px solid #eee; }
         tr:hover td { background: #f9f9f9; }
-
         .badge {
             display: inline-block;
             padding: 3px 10px;
@@ -116,26 +126,16 @@ def dashboard():
             background: #d4edda;
             color: #155724;
         }
-
-        .refresh {
-            font-size: 12px;
-            color: #888;
-            text-align: right;
-            margin-bottom: 10px;
-        }
-
+        .refresh { font-size: 12px; color: #888; text-align: right; margin-bottom: 10px; }
         .empty { text-align: center; color: #aaa; padding: 40px; }
     </style>
 </head>
 <body>
-
 <div class="header">
     <h1>🌿 HamaSense — Dashboard Deteksi Hama</h1>
     <span id="waktu">Memuat...</span>
 </div>
-
 <div class="container">
-
     <div class="stats">
         <div class="stat-card">
             <div class="angka" id="total-deteksi">-</div>
@@ -150,7 +150,6 @@ def dashboard():
             <div class="label">Deteksi Terakhir</div>
         </div>
     </div>
-
     <div class="card">
         <h2>📋 Riwayat Deteksi Hama</h2>
         <div class="refresh">Auto-refresh setiap 10 detik | <span id="last-update">-</span></div>
@@ -169,9 +168,7 @@ def dashboard():
             </tbody>
         </table>
     </div>
-
 </div>
-
 <script>
     function updateWaktu() {
         const now = new Date();
@@ -184,24 +181,20 @@ def dashboard():
             const res  = await fetch('/deteksi');
             const data = await res.json();
 
-            // Update statistik
             document.getElementById('total-deteksi').textContent = data.length;
-
             const jenis = [...new Set(data.map(d => d.label))];
             document.getElementById('total-jenis').textContent = jenis.length;
-
             if (data.length > 0) {
                 document.getElementById('deteksi-terakhir').textContent = data[0].label;
             }
 
-            // Update tabel
             const tbody = document.getElementById('tabel-data');
             if (data.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="5" class="empty">Belum ada data deteksi</td></tr>';
                 return;
             }
 
-            tbody.innerHTML = data.map((row, i) => `
+            tbody.innerHTML = data.map(row => `
                 <tr>
                     <td>${row.id}</td>
                     <td>${row.timestamp}</td>
@@ -213,21 +206,16 @@ def dashboard():
 
             document.getElementById('last-update').textContent =
                 'Update: ' + new Date().toLocaleTimeString('id-ID');
-
         } catch (err) {
             console.error('Gagal ambil data:', err);
         }
     }
 
-    // Jalankan saat pertama buka
     updateWaktu();
     ambilData();
-
-    // Auto refresh
     setInterval(ambilData, 10000);
     setInterval(updateWaktu, 1000);
 </script>
-
 </body>
 </html>
     """)
