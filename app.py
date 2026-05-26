@@ -1,17 +1,19 @@
 from flask import Flask, request, jsonify
 import sqlite3, time
+from datetime import datetime
 
 app = Flask(__name__)
 
-# === FUNGSI DATABASE ===
+# === SETUP DATABASE ===
 def init_db():
     conn = sqlite3.connect("deteksi.db")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS hasil_deteksi (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            device_id    TEXT,
-            hasil        TEXT,
-            waktu_simpan TEXT
+            timestamp    TEXT,
+            label        TEXT,
+            total        INTEGER,
+            teks_lengkap TEXT
         )
     """)
     conn.commit()
@@ -22,25 +24,35 @@ def init_db():
 def terima_deteksi():
     data = request.get_json()
 
+    # Susun format teks lengkap
+    # Contoh: 25-5-2026, 13.54.22, Wereng - total: 5
+    now          = datetime.now()
+    tanggal      = now.strftime("%-d-%-m-%Y")   # 25-5-2026
+    jam          = now.strftime("%H.%M.%S")      # 13.54.22
+    teks_lengkap = f"{tanggal}, {jam}, {data['label']} - total: {data['total']}"
+
     # Simpan ke database
-    conn = sqlite3.connect("deteksi.db")
+    conn   = sqlite3.connect("deteksi.db")
     cursor = conn.execute("""
-        INSERT INTO hasil_deteksi (device_id, hasil, waktu_simpan)
-        VALUES (?, ?, ?)
+        INSERT INTO hasil_deteksi (timestamp, label, total, teks_lengkap)
+        VALUES (?, ?, ?, ?)
     """, (
-        data["device_id"],
-        data["hasil"],
-        time.strftime("%Y-%m-%d %H:%M:%S")
+        f"{tanggal}, {jam}",
+        data["label"],
+        data["total"],
+        teks_lengkap
     ))
     conn.commit()
     id_baru = cursor.lastrowid
     conn.close()
 
+    print(f"[TERSIMPAN] {teks_lengkap}")
+
     # Balas konfirmasi ke Raspberry Pi
     return jsonify({
-        "status" : "TERSIMPAN",
-        "id"     : id_baru,
-        "pesan"  : f"Data berhasil disimpan dengan ID {id_baru}"
+        "status"      : "TERSIMPAN",
+        "id"          : id_baru,
+        "teks_lengkap": teks_lengkap
     }), 201
 
 
@@ -55,11 +67,9 @@ def ambil_semua():
     """).fetchall()
     conn.close()
 
-    hasil = [dict(row) for row in rows]
-    return jsonify(hasil), 200
+    return jsonify([dict(row) for row in rows]), 200
 
 
-# === JALANKAN SERVER ===
 if __name__ == "__main__":
     init_db()
     app.run(debug=True)
