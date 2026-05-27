@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>HamaSense — Dashboard Deteksi Hama</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/vendors/typicons/typicons.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/vendors/css/vendor.bundle.base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='assets/css/style.css') }}">
+  <style>
+    .badge-hama {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #d4edda;
+      color: #155724;
+    }
+    .alert-hama {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 10px 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<div class="container-scroller">
+
+  <!-- NAVBAR -->
+  <nav class="navbar col-lg-12 col-12 p-0 fixed-top d-flex flex-row">
+    <div class="navbar-brand-wrapper d-flex justify-content-center">
+      <div class="navbar-brand-inner-wrapper d-flex justify-content-between align-items-center w-100">
+        <a class="navbar-brand brand-logo" href="/">
+          <span style="color:white;font-weight:bold;font-size:18px;">🌿 HamaSense</span>
+        </a>
+        <button class="navbar-toggler navbar-toggler align-self-center" type="button" data-toggle="minimize">
+          <span class="typcn typcn-th-menu"></span>
+        </button>
+      </div>
+    </div>
+    <div class="navbar-menu-wrapper d-flex align-items-center justify-content-end">
+      <ul class="navbar-nav navbar-nav-right">
+        <li class="nav-item nav-date">
+          <a class="nav-link d-flex justify-content-center align-items-center" href="javascript:;">
+            <h6 class="date mb-0" id="navbar-waktu">--</h6>
+            <i class="typcn typcn-calendar ms-2"></i>
+          </a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="container-fluid page-body-wrapper">
+
+    <!-- SIDEBAR -->
+    <nav class="sidebar sidebar-offcanvas" id="sidebar">
+      <ul class="nav">
+        <li class="nav-item active">
+          <a class="nav-link" href="/">
+            <i class="typcn typcn-device-desktop menu-icon"></i>
+            <span class="menu-title">Dashboard</span>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-panel">
+      <div class="content-wrapper">
+
+        <!-- Page Title -->
+        <div class="page-header">
+          <h3 class="page-title">
+            <span class="page-title-icon bg-gradient-primary text-white me-2">
+              <i class="typcn typcn-eye"></i>
+            </span>
+            Dashboard Deteksi Hama
+          </h3>
+          <span style="font-size:12px;color:#aaa;" id="last-update">Auto-refresh setiap 10 detik</span>
+        </div>
+
+        <!-- Alert -->
+        <div class="alert-hama" id="alert-hama">
+          <strong>⚠️ Hama Terdeteksi!</strong> <span id="alert-text"></span>
+        </div>
+
+        <!-- STATISTIK -->
+        <div class="row">
+          <div class="col-md-4 stretch-card grid-margin">
+            <div class="card bg-gradient-danger card-img-holder text-white">
+              <div class="card-body">
+                <h4 class="font-weight-normal mb-3">
+                  Total Deteksi
+                  <i class="typcn typcn-chart-bar-outline float-end"></i>
+                </h4>
+                <h2 class="mb-5" id="stat-total">-</h2>
+                <h6 class="card-text">Semua objek unik terdeteksi</h6>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 stretch-card grid-margin">
+            <div class="card bg-gradient-info card-img-holder text-white">
+              <div class="card-body">
+                <h4 class="font-weight-normal mb-3">
+                  Jenis Hama
+                  <i class="typcn typcn-leaf float-end"></i>
+                </h4>
+                <h2 class="mb-5" id="stat-jenis">-</h2>
+                <h6 class="card-text">Jenis hama berbeda terdeteksi</h6>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4 stretch-card grid-margin">
+            <div class="card bg-gradient-success card-img-holder text-white">
+              <div class="card-body">
+                <h4 class="font-weight-normal mb-3">
+                  Deteksi Terakhir
+                  <i class="typcn typcn-time float-end"></i>
+                </h4>
+                <h2 class="mb-5" id="stat-terakhir" style="font-size:20px;">-</h2>
+                <h6 class="card-text" id="stat-waktu-terakhir">-</h6>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABEL -->
+        <div class="row">
+          <div class="col-12 grid-margin">
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <h4 class="card-title mb-0">📋 Riwayat Deteksi Hama</h4>
+                  <button class="btn btn-sm btn-gradient-primary" onclick="ambilData()">
+                    <i class="typcn typcn-refresh"></i> Refresh
+                  </button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-striped table-hover">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Timestamp</th>
+                        <th>Jenis Hama</th>
+                        <th>Total</th>
+                        <th>Catatan Lengkap</th>
+                      </tr>
+                    </thead>
+                    <tbody id="tabel-data">
+                      <tr>
+                        <td colspan="5" class="text-center text-muted py-4">Memuat data...</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- FOOTER -->
+      <footer class="footer">
+        <div class="d-sm-flex justify-content-center justify-content-sm-between">
+          <span class="text-muted text-center text-sm-left d-block d-sm-inline-block">
+            HamaSense — Sistem Deteksi Hama Melon Greenhouse &copy; 2026
+          </span>
+          <span class="float-none float-sm-end mt-1 mt-sm-0 text-end">
+            Institut Pertanian Stiper Yogyakarta
+          </span>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='assets/vendors/js/vendor.bundle.base.js') }}"></script>
+<script src="{{ url_for('static', filename='assets/js/template.js') }}"></script>
+<script>
+  function updateWaktu() {
+    const now = new Date();
+    document.getElementById('navbar-waktu').textContent =
+      now.toLocaleDateString('id-ID') + ' ' + now.toLocaleTimeString('id-ID');
+  }
+
+  async function ambilData() {
+    try {
+      const res  = await fetch('/deteksi');
+      const data = await res.json();
+
+      document.getElementById('stat-total').textContent = data.length;
+      const jenis = [...new Set(data.map(d => d.label))];
+      document.getElementById('stat-jenis').textContent = jenis.length;
+
+      if (data.length > 0) {
+        document.getElementById('stat-terakhir').textContent = data[0].label;
+        document.getElementById('stat-waktu-terakhir').textContent = data[0].timestamp;
+        document.getElementById('alert-hama').style.display = 'block';
+        document.getElementById('alert-text').textContent =
+          data[0].label + ' terdeteksi pada ' + data[0].timestamp;
+      }
+
+      const tbody = document.getElementById('tabel-data');
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Belum ada data deteksi</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.map(row => `
+        <tr>
+          <td>${row.id}</td>
+          <td>${row.timestamp}</td>
+          <td><span class="badge-hama">${row.label}</span></td>
+          <td><strong>${row.total}</strong></td>
+          <td>${row.teks_lengkap}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('last-update').textContent =
+        'Update terakhir: ' + new Date().toLocaleTimeString('id-ID');
+
+    } catch (err) {
+      console.error('Gagal ambil data:', err);
+    }
+  }
+
+  updateWaktu();
+  ambilData();
+  setInterval(ambilData, 10000);
+  setInterval(updateWaktu, 1000);
+</script>
+</body>
+</html>
